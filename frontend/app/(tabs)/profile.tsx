@@ -3,21 +3,18 @@ import { ScrollView, Alert } from 'react-native';
 import { VStack } from '@/components/ui/vstack';
 import { HStack } from '@/components/ui/hstack';
 import { Text } from '@/components/ui/text';
-import { Button, ButtonText } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Box } from '@/components/ui/box';
 import { Heading } from '@/components/ui/heading';
 import { Badge } from '@/components/ui/badge';
 import { Input, InputField } from '@/components/ui/input';
-import { FormControl, FormControlLabel, FormControlLabelText } from '@/components/ui/form-control';
 import { Divider } from '@/components/ui/divider';
 import { useAuthStore } from '../../store/authStore';
-import { 
+import {
   User,
   Mail,
-  Phone,
   Building,
-  MapPin,
   Calendar,
   Edit,
   Save,
@@ -26,15 +23,38 @@ import {
   Settings,
   LogOut
 } from 'lucide-react-native';
+import { getTenantNameById } from '@/services/tenant';
+import { getTeamNameById } from '@/services/team';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuthStore();
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({
     fullname: user?.fullname || '',
-    phone: user?.phone || '',
-    address: user?.address || ''
   });
+  const [tenantName, setTenantName] = useState<string>('Đang tải...');
+  const [teamName, setTeamName] = useState<string>('Đang tải...');
+
+  // Fetch tenant and team names on component mount
+  React.useEffect(() => {
+    const fetchNames = async () => {
+      if (user?.tenant_id) {
+        const name = await getTenantNameById(user.tenant_id.toString());
+        setTenantName(name);
+      } else {
+        setTenantName('Chưa có thông tin');
+      }
+
+      if (user?.team_id) {
+        const name = await getTeamNameById(user.team_id.toString());
+        setTeamName(name);
+      } else {
+        setTeamName('Chưa có nhóm');
+      }
+    };
+
+    fetchNames();
+  }, [user?.tenant_id, user?.team_id]);
 
   const handleSave = () => {
     // TODO: Implement API call to update profile
@@ -45,8 +65,6 @@ export default function ProfileScreen() {
   const handleCancel = () => {
     setEditData({
       fullname: user?.fullname || '',
-      phone: user?.phone || '',
-      address: user?.address || ''
     });
     setIsEditing(false);
   };
@@ -166,7 +184,7 @@ export default function ProfileScreen() {
                   </HStack>
                 </Badge>
                 <Badge variant="outline">
-                  <Text className="text-gray-700">{user?.team_name || 'Chưa có nhóm'}</Text>
+                  <Text className="text-gray-700">{teamName}</Text>
                 </Badge>
               </HStack>
             </VStack>
@@ -222,34 +240,19 @@ export default function ProfileScreen() {
               
               <Divider />
               
-              <InfoRow
-                icon={Phone}
-                label="Số điện thoại"
-                value={editData.phone}
-                isEditable={true}
-                field="phone"
-              />
               
-              <Divider />
               
               <InfoRow
                 icon={Building}
                 label="Công ty"
-                value={user?.tenant_name || 'Chưa có thông tin'}
-                isEditable={false}
-              />
-              
-              <Divider />
-              
-              <InfoRow
-                icon={MapPin}
-                label="Địa chỉ"
-                value={editData.address}
+                value={tenantName}
                 isEditable={true}
-                field="address"
               />
               
               <Divider />
+  
+              
+              
               
               <InfoRow
                 icon={Calendar}

@@ -8,6 +8,7 @@ import {
   getAllTeams,
   deleteTeam,
   deleteAllTeams,
+  getTeamNameById,
 } from "../controllers/team.controller";
 
 const router = express.Router();
@@ -20,6 +21,9 @@ router.put("/:id", updateTeamValidation, updateTeam);
 
 // Get teams by tenant ID
 router.get("/tenant/:tenant_id", getTeamsByTenant);
+
+// Get team name by id
+router.get("/:id/name", getTeamNameById);
 
 // Get all teams
 router.get("/", getAllTeams);

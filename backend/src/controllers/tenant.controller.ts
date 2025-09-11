@@ -163,6 +163,28 @@ export const getTenants = async (req: Request, res: Response) => {
   }
 };
 
+export const getTenantById = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const tenant = await TenantModel.getTenantById(Number(id));
+    res.json({ success: true, data: tenant });
+  } catch (error) {
+    console.error("Error getting tenant:", error);
+    res.status(500).json({ success: false, message: "Lỗi server khi lấy công ty" });
+  }
+};
+
+export const getTenantNameById = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const tenant = await TenantModel.getTenantNameById(Number(id));
+    res.json({ success: true, data: tenant });
+  } catch (error) {
+    console.error("Error getting tenant name:", error);
+    res.status(500).json({ success: false, message: "Lỗi server khi lấy tên công ty" });
+  }
+};
+
 export const deleteTenant = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;

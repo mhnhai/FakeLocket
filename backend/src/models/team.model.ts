@@ -43,6 +43,11 @@ export const getAllTeams = async (): Promise<Team[]> => {
   return result.rows;
 };
 
+export const getTeamNameById = async (id: number): Promise<Team | null> => {
+  const result = await pool.query("SELECT name FROM teams WHERE id = $1", [id]);
+  return result.rows[0] || null;
+};
+
 export const updateTeam = async (id: number, teamData: UpdateTeamInput): Promise<Team | null> => {
   const { name } = teamData;
   const result = await pool.query(

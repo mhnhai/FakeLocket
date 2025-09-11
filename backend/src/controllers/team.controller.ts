@@ -92,6 +92,20 @@ export const getAllTeams = async (req: Request, res: Response) => {
   }
 };
 
+export const getTeamNameById = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const team = await TeamModel.getTeamNameById(Number(id));
+    res.json({ success: true, data: team });
+  } catch (error) {
+    console.error("Error getting team name:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi server khi lấy tên phòng ban",
+    });
+  }
+};
+
 export const updateTeam = async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);

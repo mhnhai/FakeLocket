@@ -9,6 +9,8 @@ import {
   getTenants,
   deleteTenant,
   deleteAllTenants,
+  getTenantNameById,
+  getTenantById,
 } from "../controllers/tenant.controller";
 
 const router = express.Router();
@@ -27,6 +29,12 @@ router.post("/verify-otp", verifyTenantOtp);
 
 // Get all tenants
 router.get("/", getTenants);
+
+// get tenant by id
+router.get("/:id", getTenantById);
+
+// Get tenant name by id
+router.get("/:id/name", getTenantNameById);
 
 // Delete tenant
 router.delete("/:id", deleteTenant);

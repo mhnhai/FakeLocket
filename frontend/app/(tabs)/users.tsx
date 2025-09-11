@@ -191,7 +191,7 @@ export default function UsersScreen() {
         </HStack>
 
         {/* Users List */}
-        <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+        <ScrollView showsVerticalScrollIndicator={false}>
           <VStack space="sm">
             {filteredUsers.map((userData) => (
               <UserCard key={userData.id} user={userData} />

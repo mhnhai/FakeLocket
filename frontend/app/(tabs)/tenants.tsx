@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ScrollView, Alert, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { VStack } from '@/components/ui/vstack';
@@ -14,35 +14,26 @@ import { Modal, ModalBackdrop, ModalContent, ModalHeader, ModalCloseButton, Moda
 import { FormControl, FormControlLabel, FormControlLabelText, FormControlError, FormControlErrorText } from '@/components/ui/form-control';
 import { useAuthStore } from '../../store/authStore';
 import {
-  Search,
-  Plus,
+  getTenantById,
+  updateTenant,
+  regenerateTenantOtp
+} from '../../services/tenant';
+import { Tenant } from '../../services/types';
+import {
   Building,
-  Users,
   Edit,
-  Trash2,
   RefreshCw,
-  Copy,
-  CheckIcon
+  Copy
 } from 'lucide-react-native';
 
-interface Tenant {
-  id: number;
-  name: string;
-  otp: string;
-  created_at: string;
-}
 
 export default function TenantsScreen() {
   const { user } = useAuthStore();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [tenant, setTenant] = useState<Tenant | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Modal states
-  const [createModalVisible, setCreateModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -51,67 +42,26 @@ export default function TenantsScreen() {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  const filteredTenants = tenants.filter(tenant =>
-    tenant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    tenant.otp.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // No filtering needed for single tenant
 
-  // Load tenants data
-  const loadData = async () => {
+  // Load tenant data
+  const loadData = useCallback(async () => {
+    if (!user?.tenant_id) {
+      Alert.alert('Lỗi', 'Không thể xác định công ty của bạn');
+      return;
+    }
+
     try {
-      setIsLoading(true);
-      const response = await fetch('http://localhost:3000/api/tenants');
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setTenants(data.data);
-        }
+      const response = await getTenantById(user.tenant_id);
+      if (response.success) {
+        setTenant(response.data || null);
       }
     } catch (error) {
-      console.error('Error loading tenants:', error);
+      console.error('Error loading tenant:', error);
       Alert.alert('Lỗi', 'Không thể tải dữ liệu công ty');
-    } finally {
-      setIsLoading(false);
     }
-  };
+  }, [user?.tenant_id]);
 
-  // Create new tenant
-  const handleCreateTenant = async () => {
-    if (!formData.name.trim()) {
-      setFormErrors({ name: 'Tên công ty là bắt buộc' });
-      return;
-    }
-    if (!formData.otp.trim()) {
-      setFormErrors({ otp: 'OTP là bắt buộc' });
-      return;
-    }
-
-    try {
-      const response = await fetch('http://localhost:3000/api/tenants/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          otp: formData.otp
-        }),
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        Alert.alert('Thành công', 'Tạo công ty thành công');
-        setCreateModalVisible(false);
-        resetForm();
-        loadData();
-      } else {
-        Alert.alert('Lỗi', data.message || 'Có lỗi xảy ra');
-      }
-    } catch (error) {
-      console.error('Error creating tenant:', error);
-      Alert.alert('Lỗi', 'Không thể tạo công ty');
-    }
-  };
 
   // Update tenant
   const handleUpdateTenant = async () => {
@@ -120,27 +70,20 @@ export default function TenantsScreen() {
       return;
     }
 
-    if (!selectedTenant) return;
+    if (!tenant) return;
 
     try {
-      const response = await fetch(`http://localhost:3000/api/tenants/${selectedTenant.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: formData.name
-        }),
+      const response = await updateTenant(tenant.id, {
+        name: formData.name
       });
 
-      const data = await response.json();
-      if (data.success) {
+      if (response.success) {
         Alert.alert('Thành công', 'Cập nhật công ty thành công');
         setEditModalVisible(false);
         resetForm();
         loadData();
       } else {
-        Alert.alert('Lỗi', data.message || 'Có lỗi xảy ra');
+        Alert.alert('Lỗi', response.message || 'Có lỗi xảy ra');
       }
     } catch (error) {
       console.error('Error updating tenant:', error);
@@ -148,38 +91,6 @@ export default function TenantsScreen() {
     }
   };
 
-  // Delete tenant
-  const handleDeleteTenant = async (tenantId: number) => {
-    Alert.alert(
-      'Xác nhận xóa',
-      'Bạn có chắc chắn muốn xóa công ty này? Tất cả phòng ban và người dùng liên quan sẽ bị ảnh hưởng.',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Xóa',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const response = await fetch(`http://localhost:3000/api/tenants/${tenantId}`, {
-                method: 'DELETE',
-              });
-
-              const data = await response.json();
-              if (data.success) {
-                Alert.alert('Thành công', 'Xóa công ty thành công');
-                loadData();
-              } else {
-                Alert.alert('Lỗi', data.message || 'Có lỗi xảy ra');
-              }
-            } catch (error) {
-              console.error('Error deleting tenant:', error);
-              Alert.alert('Lỗi', 'Không thể xóa công ty');
-            }
-          }
-        }
-      ]
-    );
-  };
 
   // Regenerate OTP
   const handleRegenerateOtp = async (tenantId: number) => {
@@ -192,16 +103,13 @@ export default function TenantsScreen() {
           text: 'Tạo mới',
           onPress: async () => {
             try {
-              const response = await fetch(`http://localhost:3000/api/tenants/${tenantId}/regenerate-otp`, {
-                method: 'POST',
-              });
+              const response = await regenerateTenantOtp(tenantId);
 
-              const data = await response.json();
-              if (data.success) {
-                Alert.alert('Thành công', `OTP mới: ${data.data.otp}`);
+              if (response.success) {
+                Alert.alert('Thành công', `OTP mới: ${response.data?.otp || 'N/A'}`);
                 loadData();
               } else {
-                Alert.alert('Lỗi', data.message || 'Có lỗi xảy ra');
+                Alert.alert('Lỗi', response.message || 'Có lỗi xảy ra');
               }
             } catch (error) {
               console.error('Error regenerating OTP:', error);
@@ -222,11 +130,11 @@ export default function TenantsScreen() {
   };
 
   // Open edit modal
-  const openEditModal = (tenant: Tenant) => {
-    setSelectedTenant(tenant);
+  const openEditModal = () => {
+    if (!tenant) return;
     setFormData({
       name: tenant.name,
-      otp: tenant.otp
+      otp: tenant.otp || ''
     });
     setEditModalVisible(true);
   };
@@ -235,7 +143,6 @@ export default function TenantsScreen() {
   const resetForm = () => {
     setFormData({ name: '', otp: '' });
     setFormErrors({});
-    setSelectedTenant(null);
   };
 
   // Refresh data
@@ -247,7 +154,7 @@ export default function TenantsScreen() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const TenantCard = ({ tenant }: { tenant: Tenant }) => (
     <Card className="p-4 bg-white border border-gray-200 mb-3">
@@ -260,7 +167,7 @@ export default function TenantsScreen() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onPress={() => copyOtp(tenant.otp)}
+                  onPress={() => copyOtp(tenant.otp || 'N/A')}
                 >
                   <Copy size={16} color="#007AFF" />
                 </Button>
@@ -274,16 +181,9 @@ export default function TenantsScreen() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onPress={() => openEditModal(tenant)}
+                  onPress={() => openEditModal()}
                 >
                   <Edit size={16} color="#007AFF" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onPress={() => handleDeleteTenant(tenant.id)}
-                >
-                  <Trash2 size={16} color="#FF3B30" />
                 </Button>
               </HStack>
             </HStack>
@@ -338,139 +238,33 @@ export default function TenantsScreen() {
       <VStack space="lg" className="p-4">
         {/* Header */}
         <HStack className="justify-between items-center">
-          <Heading size="xl">Quản lý công ty</Heading>
-          <Button
-            size="sm"
-            onPress={() => setCreateModalVisible(true)}
+          <Heading size="xl">Thông tin công ty</Heading>
+        </HStack>
+
+        {/* Tenant Info */}
+        {tenant ? (
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
+            }
           >
-            <HStack space="xs" className="items-center">
-              <Plus size={16} />
-              <ButtonText>Thêm mới</ButtonText>
-            </HStack>
-          </Button>
-        </HStack>
-
-        {/* Search */}
-        <Box className="relative">
-          <Input>
-            <InputField
-              placeholder="Tìm kiếm công ty..."
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </Input>
-          <Box className="absolute right-3 top-3">
-            <Search size={20} color="#666" />
-          </Box>
-        </Box>
-
-        {/* Stats */}
-        <HStack space="sm">
-          <Card className="flex-1 p-3 bg-white border border-gray-200">
-            <VStack className="items-center">
-              <Text className="text-2xl font-bold text-blue-600">{tenants.length}</Text>
-              <Text className="text-sm text-gray-600">Tổng số</Text>
+            <VStack space="sm">
+              <TenantCard tenant={tenant} />
             </VStack>
-          </Card>
-          <Card className="flex-1 p-3 bg-white border border-gray-200">
-            <VStack className="items-center">
-              <Text className="text-2xl font-bold text-green-600">{tenants.length}</Text>
-              <Text className="text-sm text-gray-600">Hoạt động</Text>
-            </VStack>
-          </Card>
-          <Card className="flex-1 p-3 bg-white border border-gray-200">
-            <VStack className="items-center">
-              <Text className="text-2xl font-bold text-purple-600">
-                {tenants.reduce((sum, t) => sum + t.otp.length, 0)}
+          </ScrollView>
+        ) : (
+          <Box className="flex-1 justify-center items-center py-12">
+            <VStack space="md" className="items-center">
+              <Building size={64} color="#666" />
+              <Text className="text-lg font-semibold text-center">Không tìm thấy thông tin công ty</Text>
+              <Text className="text-gray-600 text-center">
+                Không thể tải thông tin công ty của bạn
               </Text>
-              <Text className="text-sm text-gray-600">OTP</Text>
             </VStack>
-          </Card>
-        </HStack>
+          </Box>
+        )}
 
-        {/* Tenants List */}
-        <ScrollView
-          className="flex-1"
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
-          }
-        >
-          <VStack space="sm">
-            {filteredTenants.map((tenant) => (
-              <TenantCard key={tenant.id} tenant={tenant} />
-            ))}
-          </VStack>
-        </ScrollView>
-
-        {/* Create Tenant Modal */}
-        <Modal
-          isOpen={createModalVisible}
-          onClose={() => {
-            setCreateModalVisible(false);
-            resetForm();
-          }}
-        >
-          <ModalBackdrop />
-          <ModalContent>
-            <ModalHeader>
-              <Heading size="md">Tạo công ty mới</Heading>
-              <ModalCloseButton>
-                <Text>✕</Text>
-              </ModalCloseButton>
-            </ModalHeader>
-            <ModalBody>
-              <VStack space="md">
-                <FormControl isInvalid={!!formErrors.name}>
-                  <FormControlLabel>
-                    <FormControlLabelText>Tên công ty</FormControlLabelText>
-                  </FormControlLabel>
-                  <Input>
-                    <InputField
-                      placeholder="Nhập tên công ty"
-                      value={formData.name}
-                      onChangeText={(text) => setFormData({ ...formData, name: text })}
-                    />
-                  </Input>
-                  <FormControlError>
-                    <FormControlErrorText>{formErrors.name}</FormControlErrorText>
-                  </FormControlError>
-                </FormControl>
-
-                <FormControl isInvalid={!!formErrors.otp}>
-                  <FormControlLabel>
-                    <FormControlLabelText>Mã OTP</FormControlLabelText>
-                  </FormControlLabel>
-                  <Input>
-                    <InputField
-                      placeholder="Nhập mã OTP (6-10 ký tự)"
-                      value={formData.otp}
-                      onChangeText={(text) => setFormData({ ...formData, otp: text })}
-                      maxLength={10}
-                    />
-                  </Input>
-                  <FormControlError>
-                    <FormControlErrorText>{formErrors.otp}</FormControlErrorText>
-                  </FormControlError>
-                </FormControl>
-              </VStack>
-            </ModalBody>
-            <ModalFooter>
-              <Button
-                variant="outline"
-                onPress={() => {
-                  setCreateModalVisible(false);
-                  resetForm();
-                }}
-              >
-                <ButtonText>Hủy</ButtonText>
-              </Button>
-              <Button onPress={handleCreateTenant}>
-                <ButtonText>Tạo công ty</ButtonText>
-              </Button>
-            </ModalFooter>
-          </ModalContent>
-        </Modal>
 
         {/* Edit Tenant Modal */}
         <Modal
@@ -505,10 +299,6 @@ export default function TenantsScreen() {
                     <FormControlErrorText>{formErrors.name}</FormControlErrorText>
                   </FormControlError>
                 </FormControl>
-
-                <Text className="text-sm text-gray-600">
-                  OTP hiện tại: <Text className="font-mono font-semibold">{formData.otp}</Text>
-                </Text>
               </VStack>
             </ModalBody>
             <ModalFooter>

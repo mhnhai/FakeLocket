@@ -14,35 +14,17 @@ import { Modal, ModalBackdrop, ModalContent, ModalHeader, ModalCloseButton, Moda
 import { Select, SelectTrigger, SelectInput, SelectIcon, SelectPortal, SelectBackdrop, SelectContent, SelectItem } from '@/components/ui/select';
 import { FormControl, FormControlLabel, FormControlLabelText, FormControlError, FormControlErrorText } from '@/components/ui/form-control';
 import { useAuthStore } from '../../store/authStore';
-import { authService } from '../../services/auth';
+import { createTeam, deleteTeam, getAllTeams, updateTeam } from '../../services/team';
+import { getAllTenants } from '../../services/tenant';
+import { Team, Tenant } from '../../services/types';
 import {
   Search,
   Plus,
-  Users,
-  MoreVertical,
-  User,
   Building,
   Edit,
   Trash2,
-  ChevronDown,
-  CheckIcon
+  ChevronDown
 } from 'lucide-react-native';
-
-interface Team {
-  id: number;
-  name: string;
-  tenant_id: number;
-  created_at: string;
-  memberCount?: number;
-  status?: string;
-}
-
-interface Tenant {
-  id: number;
-  name: string;
-  otp: string;
-  created_at: string;
-}
 
 export default function TeamsScreen() {
   const { user } = useAuthStore();
@@ -74,21 +56,15 @@ export default function TeamsScreen() {
       setIsLoading(true);
 
       // Load teams
-      const teamsResponse = await fetch('http://localhost:3000/api/teams');
-      if (teamsResponse.ok) {
-        const teamsData = await teamsResponse.json();
-        if (teamsData.success) {
-          setTeams(teamsData.data);
-        }
+      const teamsResponse = await getAllTeams();
+      if (teamsResponse.success) {
+        setTeams(teamsResponse.data || []);
       }
 
       // Load tenants
-      const tenantsResponse = await fetch('http://localhost:3000/api/tenants');
-      if (tenantsResponse.ok) {
-        const tenantsData = await tenantsResponse.json();
-        if (tenantsData.success) {
-          setTenants(tenantsData.data);
-        }
+      const tenantsResponse = await getAllTenants();
+      if (tenantsResponse.success) {
+        setTenants(tenantsResponse.data || []);
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -110,25 +86,18 @@ export default function TeamsScreen() {
     }
 
     try {
-      const response = await fetch('http://localhost:3000/api/teams/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          tenant_id: parseInt(formData.tenant_id)
-        }),
+      const response = await createTeam({
+        name: formData.name,
+        tenant_id: parseInt(formData.tenant_id)
       });
 
-      const data = await response.json();
-      if (data.success) {
+      if (response.success) {
         Alert.alert('Thành công', 'Tạo phòng ban thành công');
         setCreateModalVisible(false);
         resetForm();
         loadData();
       } else {
-        Alert.alert('Lỗi', data.message || 'Có lỗi xảy ra');
+        Alert.alert('Lỗi', response.message || 'Có lỗi xảy ra');
       }
     } catch (error) {
       console.error('Error creating team:', error);
@@ -146,24 +115,17 @@ export default function TeamsScreen() {
     if (!selectedTeam) return;
 
     try {
-      const response = await fetch(`http://localhost:3000/api/teams/${selectedTeam.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: formData.name
-        }),
+      const response = await updateTeam(selectedTeam.id, {
+        name: formData.name
       });
 
-      const data = await response.json();
-      if (data.success) {
+      if (response.success) {
         Alert.alert('Thành công', 'Cập nhật phòng ban thành công');
         setEditModalVisible(false);
         resetForm();
         loadData();
       } else {
-        Alert.alert('Lỗi', data.message || 'Có lỗi xảy ra');
+        Alert.alert('Lỗi', response.message || 'Có lỗi xảy ra');
       }
     } catch (error) {
       console.error('Error updating team:', error);
@@ -183,16 +145,13 @@ export default function TeamsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const response = await fetch(`http://localhost:3000/api/teams/${teamId}`, {
-                method: 'DELETE',
-              });
+              const response = await deleteTeam(teamId);
 
-              const data = await response.json();
-              if (data.success) {
+              if (response.success) {
                 Alert.alert('Thành công', 'Xóa phòng ban thành công');
                 loadData();
               } else {
-                Alert.alert('Lỗi', data.message || 'Có lỗi xảy ra');
+                Alert.alert('Lỗi', response.message || 'Có lỗi xảy ra');
               }
             } catch (error) {
               console.error('Error deleting team:', error);
@@ -231,10 +190,9 @@ export default function TeamsScreen() {
   useEffect(() => {
     loadData();
   }, []);
-
+// TeamCard 
   const TeamCard = ({ team }: { team: Team }) => {
     const tenant = tenants.find(t => t.id === team.tenant_id);
-
     return (
       <Card className="p-4 bg-white border border-gray-200 mb-3">
         <VStack space="md">
@@ -358,7 +316,6 @@ export default function TeamsScreen() {
 
         {/* Teams List */}
         <ScrollView
-          className="flex-1"
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />

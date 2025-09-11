@@ -4,19 +4,21 @@ import { router } from 'expo-router';
 import { VStack } from '@/components/ui/vstack';
 import { HStack } from '@/components/ui/hstack';
 import { Text } from '@/components/ui/text';
-import { Button, ButtonText } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Box } from '@/components/ui/box';
 import { Heading } from '@/components/ui/heading';
 import { Badge } from '@/components/ui/badge';
 import { Divider } from '@/components/ui/divider';
 import { useAuthStore } from '../../store/authStore';
-import { 
-  Users, 
-  Building, 
-  Activity, 
-  TrendingUp, 
-  LogOut, 
+import { getAllUsers } from '../../services/user';
+import { getAllTeams } from '../../services/team';
+import { getAllTenants } from '../../services/tenant';
+import {
+  Users,
+  Building,
+  Activity,
+  LogOut,
   Settings,
   UserPlus,
   Building2,
@@ -30,6 +32,7 @@ interface DashboardStats {
   totalTenants: number;
   activeUsers: number;
 }
+
 
 export default function AdminDashboard() {
   const { user, logout } = useAuthStore();
@@ -52,36 +55,27 @@ export default function AdminDashboard() {
   // Load dashboard data
   const loadDashboardData = async () => {
     try {
-      // Load real data from API
+      // Load real data from API using service functions
       const [usersResponse, teamsResponse, tenantsResponse] = await Promise.all([
-        fetch('/users'),
-        fetch('/teams'),
-        fetch('/tenants')
+        getAllUsers(),
+        getAllTeams(),
+        getAllTenants()
       ]);
 
       let totalUsers = 0;
       let totalTeams = 0;
       let totalTenants = 0;
 
-      if (usersResponse.ok) {
-        const usersData = await usersResponse.json();
-        if (usersData.success) {
-          totalUsers = usersData.data.length;
-        }
+      if (usersResponse.success) {
+        totalUsers = usersResponse.data?.length || 0;
       }
 
-      if (teamsResponse.ok) {
-        const teamsData = await teamsResponse.json();
-        if (teamsData.success) {
-          totalTeams = teamsData.data.length;
-        }
+      if (teamsResponse.success) {
+        totalTeams = teamsResponse.data?.length || 0;
       }
 
-      if (tenantsResponse.ok) {
-        const tenantsData = await tenantsResponse.json();
-        if (tenantsData.success) {
-          totalTenants = tenantsData.data.length;
-        }
+      if (tenantsResponse.success) {
+        totalTenants = tenantsResponse.data?.length || 0;
       }
 
       setStats({

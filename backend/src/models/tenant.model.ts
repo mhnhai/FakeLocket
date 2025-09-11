@@ -41,6 +41,11 @@ export const getAllTenants = async (): Promise<Tenant[]> => {
   return result.rows;
 };
 
+export const getTenantNameById = async (id: number): Promise<Tenant | null> => {
+  const result = await pool.query("SELECT name FROM tenants WHERE id = $1", [id]);
+  return result.rows[0] || null;
+};
+
 export const updateTenant = async (id: number, tenantData: UpdateTenantInput): Promise<Tenant | null> => {
   const updates = [];
   const values = [];
